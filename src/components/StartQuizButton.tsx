@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { track } from "@/lib/analytics";
 
 export function StartQuizButton({ className = "" }: { className?: string }) {
   const router = useRouter();
@@ -26,6 +27,7 @@ export function StartQuizButton({ className = "" }: { className?: string }) {
 
       if (!res.ok) throw new Error("Falha ao criar sessão");
       const { session_id } = await res.json();
+      track("StartQuiz", { session_id });
       router.push(`/quiz/${session_id}`);
     } catch {
       setLoading(false);

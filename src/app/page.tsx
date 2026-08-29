@@ -1,9 +1,11 @@
 import { Card } from "@/components/Card";
 import { StartQuizButton } from "@/components/StartQuizButton";
+import { TrackOnMount } from "@/components/TrackOnMount";
 
 export default function LandingPage() {
   return (
     <main className="flex flex-1 flex-col items-center bg-primary-light">
+      <TrackOnMount event="ViewLanding" />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center gap-8 px-6 py-16 text-center">
         <span className="rounded-full bg-white px-4 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
           Mapa do Amor

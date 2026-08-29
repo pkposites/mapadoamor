@@ -111,7 +111,7 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 - [x] Commit 5 — preview e resultado mockado
 - [x] Commit 6 — Mercado Pago sandbox + webhook
 - [x] Commit 7 — bloqueio/liberação do resultado e estados de erro
-- [ ] Commit 8 — analytics + UTMs
+- [x] Commit 8 — analytics + UTMs
 - [ ] Commit 9 — páginas legais + revisão de segurança
 - [ ] Commit 10 — produção, QA e tag v1.0.0
 
@@ -240,3 +240,44 @@ confirmado nunca volte a bloquear o resultado**.
   "finalizando" em vez de mandar de volta pro preview.
 - Sessões `paid`/`completed` que revisitam `/quiz` ou `/analise` pulam
   direto para o resultado/preview certo, sem recalcular à toa.
+
+## Analytics e UTMs (Commit 8)
+
+Os 13 eventos da seção 15 estão instrumentados fim a fim: `ViewLanding`,
+`StartQuiz`, `AnswerQuestion`, `Quiz25/50/75`, `CompleteQuiz`,
+`ViewPreview`, `InitiateCheckout`, `PixGenerated`, `Purchase`,
+`ViewFullResult`, `ShareResult`.
+
+- `src/lib/analytics.ts` (`track()`) dispara pro Meta Pixel (`fbq`) — como
+  evento padrão (`InitiateCheckout`/`Purchase`) ou customizado — pro GA4
+  (`gtag`) e faz um log best-effort em `mda_events` via `POST /api/events`,
+  que alimenta o futuro painel de funil (seção 19). **Nunca** manda
+  resposta de quiz, score ou qualquer dado sensível — só nome do evento,
+  `session_id`, valor e moeda quando aplicável (seção 15, última linha).
+- `POST /api/events` é público (sem auth, chamado do browser) — por isso
+  valida o `event_name` contra uma whitelist fechada e sanitiza o
+  metadata (`sanitizeEventMetadata`, testado) para não virar vetor de
+  abuso nem guardar dado sensível por engano.
+- `AnalyticsScripts` só carrega os scripts do Pixel/GA4 se
+  `NEXT_PUBLIC_META_PIXEL_ID` / `NEXT_PUBLIC_GA_MEASUREMENT_ID`
+  estiverem configurados — em dev, sem essas variáveis, o app roda sem
+  nenhum script de terceiro.
+- `Purchase` é registrado duas vezes por design: no servidor, pelo
+  webhook (fonte de verdade em `mda_events`, sem acesso ao browser) e no
+  client, uma única vez por sessão via `localStorage`
+  (`TrackPurchase`) — é o disparo que alimenta a otimização de campanha
+  do Meta/GA4, que só recebe eventos vindos do navegador (CAPI server-side
+  fica fora do escopo do MVP).
+- UTMs (`utm_source/medium/campaign/content/term`) já são capturadas na
+  criação da sessão (Commit 2) e persistidas em `mda_quiz_sessions`.
+
+### Nota de segurança pendente
+
+`/resultado/[session]` usa o `session_id` (UUID aleatório) como a própria
+chave de acesso ao resultado pago. `ShareResultButton` compartilha essa
+URL diretamente. O schema já tem um `access_token` dedicado em
+`mda_results` (pensado como link seguro de compartilhamento, seção 13),
+mas ele ainda não é usado — trocar a rota de resultado para usar
+`access_token` em vez do `session_id` bruto é um endurecimento de
+segurança recomendado antes do lançamento, não feito neste commit para
+não expandir escopo além de analytics.

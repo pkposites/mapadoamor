@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 import { Card } from "@/components/Card";
+import { TrackOnMount } from "@/components/TrackOnMount";
+import { TrackPurchase } from "@/components/TrackPurchase";
+import { ShareResultButton } from "@/components/ShareResultButton";
 import { DIMENSION_LABELS, DIMENSIONS } from "@/lib/dimensions";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { FullResult } from "@/lib/result-content";
@@ -50,6 +53,8 @@ export default async function ResultadoPage({
 
   return (
     <main className="flex flex-1 flex-col gap-6 bg-primary-light px-6 py-10">
+      <TrackOnMount event="ViewFullResult" params={{ session_id: sessionId }} />
+      <TrackPurchase sessionId={sessionId} />
       <div className="mx-auto w-full max-w-md space-y-6">
         <Card>
           <p className="text-xs font-medium uppercase tracking-wide text-primary">
@@ -148,6 +153,8 @@ export default async function ResultadoPage({
             ))}
           </ul>
         </Card>
+
+        <ShareResultButton sessionId={sessionId} />
 
         <p className="text-center text-xs text-muted">{result.disclaimer}</p>
       </div>

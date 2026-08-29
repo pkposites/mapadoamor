@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { TrackOnMount } from "@/components/TrackOnMount";
 import { createServiceClient } from "@/lib/supabase/server";
 import { DIMENSION_LABELS, type DimensionKey } from "@/lib/dimensions";
 import { buildPreviewTeaser, previewCategory } from "@/lib/result-content";
@@ -53,6 +54,7 @@ export default async function PreviewPage({
 
   return (
     <main className="flex flex-1 flex-col bg-primary-light px-6 py-10">
+      <TrackOnMount event="ViewPreview" params={{ session_id: sessionId }} />
       <div className="mx-auto flex w-full max-w-md flex-col gap-6">
         <Card>
           <p className="text-xs font-medium uppercase tracking-wide text-muted">

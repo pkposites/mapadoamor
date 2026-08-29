@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/Card";
 import type { Question } from "@/lib/questions";
+import { track } from "@/lib/analytics";
+import type { AnalyticsEvent } from "@/lib/analytics-events";
 
-const MICROFEEDBACK: { at: number; text: string }[] = [
-  { at: 0.25, text: "Já temos sinais suficientes para começar a mapear sua dinâmica." },
-  { at: 0.5, text: "Um padrão de reciprocidade está começando a aparecer." },
-  { at: 0.75, text: "Estamos cruzando conexão, segurança e comunicação." },
+const MICROFEEDBACK: { at: number; text: string; event: AnalyticsEvent }[] = [
+  { at: 0.25, text: "Já temos sinais suficientes para começar a mapear sua dinâmica.", event: "Quiz25" },
+  { at: 0.5, text: "Um padrão de reciprocidade está começando a aparecer.", event: "Quiz50" },
+  { at: 0.75, text: "Estamos cruzando conexão, segurança e comunicação.", event: "Quiz75" },
 ];
 
 export function QuizFlow({
@@ -56,9 +58,15 @@ export function QuizFlow({
       });
       const data = await res.json().catch(() => null);
 
-      if (nextMicrofeedback) setFeedback(nextMicrofeedback.text);
+      track("AnswerQuestion", { session_id: sessionId, question_index: index + 1 });
+
+      if (nextMicrofeedback) {
+        setFeedback(nextMicrofeedback.text);
+        track(nextMicrofeedback.event, { session_id: sessionId });
+      }
 
       if (index + 1 >= total || data?.completed) {
+        track("CompleteQuiz", { session_id: sessionId });
         router.push(`/analise/${sessionId}`);
         return;
       }

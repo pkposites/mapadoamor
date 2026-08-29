@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/Card";
+import { track } from "@/lib/analytics";
 
 const POLL_INTERVAL_MS = 4000;
 const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos de polling
@@ -45,6 +46,7 @@ export function PixPayment({ sessionId }: { sessionId: string }) {
           return;
         }
         setData(json);
+        track("PixGenerated", { session_id: sessionId, value: 37.9, currency: "BRL" });
         poll();
       } catch {
         if (!cancelled) {
