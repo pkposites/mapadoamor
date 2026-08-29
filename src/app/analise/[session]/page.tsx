@@ -1,7 +1,8 @@
 import { Card } from "@/components/Card";
+import { AnaliseRunner } from "@/components/AnaliseRunner";
 
-// Animação curta de conclusão + disparo do cálculo real (POST /api/calculate).
-// Implementado junto com o scoring engine (Commit 4).
+// Animação curta de conclusão que dispara o cálculo real (POST
+// /api/calculate) e, ao terminar, redireciona para o pré-resultado.
 export default async function AnalisePage({
   params,
 }: PageProps<"/analise/[session]">) {
@@ -13,7 +14,7 @@ export default async function AnalisePage({
         <p className="text-lg font-semibold text-primary">
           Analisando suas respostas…
         </p>
-        <p className="mt-2 text-sm text-muted">Sessão: {session}</p>
+        <AnaliseRunner sessionId={session} />
       </Card>
     </main>
   );

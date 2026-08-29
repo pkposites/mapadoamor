@@ -107,7 +107,7 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 - [x] Commit 1 — scaffold do app, design tokens, rotas e README
 - [x] Commit 2 — schema Supabase + migrations + sessão anônima
 - [x] Commit 3 — banco de perguntas + interface do quiz
-- [ ] Commit 4 — scoring engine + testes unitários
+- [x] Commit 4 — scoring engine + testes unitários
 - [ ] Commit 5 — preview e resultado mockado
 - [ ] Commit 6 — Mercado Pago sandbox + webhook
 - [ ] Commit 7 — bloqueio/liberação do resultado e estados de erro
@@ -133,4 +133,24 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 ```bash
 npm install
 npm run dev
+npm run test   # testes unitários (vitest) do motor de pontuação
 ```
+
+## Motor de pontuação
+
+`src/lib/scoring.ts` implementa as camadas 1–4 da personalização (seção
+6.4), puras e determinísticas — sem IA decidindo score, conforme
+recomendação técnica da seção 6.3:
+
+- **Camada 1** `determineProfile` — perfil predominante entre os 7,
+  avaliado por regras de prioridade sobre os 6 índices.
+- **Camada 2** `calculateDimensionScores` — média 0–100 por dimensão a
+  partir das respostas cruas.
+- **Camada 3** `topStrengths` / `attentionAreas` — 2 maiores forças e 2
+  menores índices.
+- **Camada 4** `detectCombinations` — combinações relevantes entre
+  dimensões (ex.: conexão alta + segurança baixa).
+
+`POST /api/calculate` valida que a sessão respondeu as 24 perguntas,
+executa o motor e persiste o resultado em `mda_quiz_scores`. Thresholds
+das regras são provisórios — mesma decisão em aberto do questionário.
