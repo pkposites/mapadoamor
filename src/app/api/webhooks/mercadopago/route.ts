@@ -47,11 +47,31 @@ export async function POST(request: Request) {
   const supabase = createServiceClient();
   const status = mapStatus(payment.status);
 
+  const { data: currentRow } = await supabase
+    .from("mda_payments")
+    .select("status, paid_at")
+    .eq("session_id", sessionId)
+    .eq("provider", "mercadopago")
+    .eq("provider_payment_id", payment.id)
+    .maybeSingle();
+
+  if (!currentRow) {
+    // O Mercado Pago retenta webhooks várias vezes até receber 200; se o
+    // pagamento já foi substituído por um novo PIX (expirado/regerado),
+    // não há mais linha correspondente — apenas confirma o recebimento.
+    return NextResponse.json({ received: true });
+  }
+
+  // Idempotência: já processamos essa mesma transição para "paid" antes
+  // (reentrega do mesmo evento). Evita duplicar paid_at e o evento
+  // Purchase no analytics a cada retry do Mercado Pago.
+  const alreadyPaid = currentRow.status === "paid";
+
   const { error: updateError } = await supabase
     .from("mda_payments")
     .update({
       status,
-      paid_at: status === "paid" ? new Date().toISOString() : null,
+      paid_at: status === "paid" ? (currentRow.paid_at ?? new Date().toISOString()) : null,
     })
     .eq("session_id", sessionId)
     .eq("provider", "mercadopago")
@@ -63,11 +83,14 @@ export async function POST(request: Request) {
 
   if (status === "paid") {
     await supabase.from("mda_quiz_sessions").update({ status: "paid" }).eq("id", sessionId);
-    await supabase.from("mda_events").insert({
-      session_id: sessionId,
-      event_name: "Purchase",
-      metadata: { provider: "mercadopago", amount: 37.9, currency: "BRL" },
-    });
+
+    if (!alreadyPaid) {
+      await supabase.from("mda_events").insert({
+        session_id: sessionId,
+        event_name: "Purchase",
+        metadata: { provider: "mercadopago", amount: 37.9, currency: "BRL" },
+      });
+    }
   }
 
   return NextResponse.json({ received: true });

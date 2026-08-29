@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { effectiveStatus } from "@/lib/payment-state";
 
 export async function GET(
   _request: Request,
@@ -19,10 +20,18 @@ export async function GET(
     return NextResponse.json({ status: "not_found" }, { status: 404 });
   }
 
-  const expired =
-    payment.status === "pending" &&
-    payment.expires_at &&
-    new Date(payment.expires_at).getTime() <= Date.now();
+  const status = effectiveStatus(payment);
 
-  return NextResponse.json({ status: expired ? "expired" : payment.status });
+  // Persiste a transição pending → expired para o histórico refletir a
+  // realidade (e para /api/payments/create não precisar recalcular do zero
+  // sempre que a tela de pagamento reabrir).
+  if (status !== payment.status) {
+    await supabase
+      .from("mda_payments")
+      .update({ status })
+      .eq("session_id", sessionId)
+      .eq("provider", "mercadopago");
+  }
+
+  return NextResponse.json({ status });
 }

@@ -17,9 +17,8 @@ export default async function QuizPage({
     .maybeSingle<QuizSession>();
 
   if (!session) notFound();
-  if (session.status === "completed" || session.status === "paid") {
-    redirect(`/analise/${sessionId}`);
-  }
+  if (session.status === "paid") redirect(`/resultado/${sessionId}`);
+  if (session.status === "completed") redirect(`/analise/${sessionId}`);
 
   const { data: answers } = await supabase
     .from("mda_quiz_answers")

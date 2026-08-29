@@ -110,7 +110,7 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 - [x] Commit 4 — scoring engine + testes unitários
 - [x] Commit 5 — preview e resultado mockado
 - [x] Commit 6 — Mercado Pago sandbox + webhook
-- [ ] Commit 7 — bloqueio/liberação do resultado e estados de erro
+- [x] Commit 7 — bloqueio/liberação do resultado e estados de erro
 - [ ] Commit 8 — analytics + UTMs
 - [ ] Commit 9 — páginas legais + revisão de segurança
 - [ ] Commit 10 — produção, QA e tag v1.0.0
@@ -215,3 +215,28 @@ contra o provedor real.
   sobre e-mails de pagador não verificáveis.
 - Configurar `NEXT_PUBLIC_SITE_URL` com a URL pública em produção (usada
   para montar a `notification_url` do webhook).
+
+## Estados de erro do pagamento (Commit 7)
+
+`src/lib/payment-state.ts` centraliza (e testa) as regras de transição de
+estado do PIX — `paid`/`cancelled` são terminais e nunca regridem, mesmo
+que `expires_at` já tenha passado, para garantir que **um pagamento
+confirmado nunca volte a bloquear o resultado**.
+
+- `POST /api/payments/create` recusa criar PIX antes do quiz concluído
+  (409), reaproveita um PIX ainda válido, e gera um novo automaticamente
+  quando o anterior expirou.
+- `GET /api/payment-status/:session` persiste a transição `pending` →
+  `expired` no banco (não fica só no cálculo em memória).
+- `POST /api/webhooks/mercadopago` é idempotente contra reentrega: só
+  registra `paid_at` e dispara o evento `Purchase` na primeira transição
+  para pago — reentregas do mesmo evento (comportamento normal do MP até
+  receber 200) não duplicam o evento de compra no analytics.
+- A tela de pagamento mostra "Gerar novo PIX" quando o código expira ou o
+  pagamento é recusado, em vez de deixar a usuária travada.
+- `/resultado/[session]` nunca entra em loop de redirect com o preview:
+  se o pagamento está confirmado mas o resultado ainda não foi calculado
+  (não deveria acontecer no funil normal), mostra uma tela de
+  "finalizando" em vez de mandar de volta pro preview.
+- Sessões `paid`/`completed` que revisitam `/quiz` ou `/analise` pulam
+  direto para o resultado/preview certo, sem recalcular à toa.

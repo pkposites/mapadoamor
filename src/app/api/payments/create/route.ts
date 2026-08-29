@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { createPixPayment } from "@/lib/mercadopago";
+import { effectiveStatus, isReusable } from "@/lib/payment-state";
 
 const PIX_AMOUNT = 37.9;
 
@@ -27,6 +28,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sessão não encontrada." }, { status: 404 });
   }
 
+  // Não vende PIX antes do quiz estar concluído e pontuado — evita cobrar
+  // por um resultado que ainda não existe.
+  if (session.status !== "completed" && session.status !== "paid") {
+    return NextResponse.json(
+      { error: "Quiz ainda não concluído para esta sessão." },
+      { status: 409 },
+    );
+  }
+
   const { data: existing } = await supabase
     .from("mda_payments")
     .select("*")
@@ -34,23 +44,30 @@ export async function POST(request: Request) {
     .eq("provider", "mercadopago")
     .maybeSingle();
 
-  if (existing?.status === "paid") {
+  const currentStatus = existing ? effectiveStatus(existing) : null;
+
+  if (currentStatus === "paid") {
     return NextResponse.json({ status: "paid" });
   }
 
-  const stillValid =
-    existing?.status === "pending" &&
-    existing.expires_at &&
-    new Date(existing.expires_at).getTime() > Date.now();
-
-  if (stillValid) {
+  if (isReusable(existing)) {
     return NextResponse.json({
-      status: existing.status,
-      qr_code: existing.qr_code,
-      pix_copy_paste: existing.pix_copy_paste,
-      expires_at: existing.expires_at,
+      status: "pending",
+      qr_code: existing!.qr_code,
+      pix_copy_paste: existing!.pix_copy_paste,
+      expires_at: existing!.expires_at,
       amount: PIX_AMOUNT,
     });
+  }
+
+  // Pagamento anterior expirado/cancelado: marca o estado antes de gerar um
+  // novo, para o histórico não ficar preso em "pending" para sempre.
+  if (existing && currentStatus && currentStatus !== existing.status) {
+    await supabase
+      .from("mda_payments")
+      .update({ status: currentStatus })
+      .eq("session_id", sessionId)
+      .eq("provider", "mercadopago");
   }
 
   let payment;
@@ -78,6 +95,7 @@ export async function POST(request: Request) {
       qr_code: payment.qr_code_base64,
       pix_copy_paste: payment.qr_code,
       expires_at: payment.expires_at,
+      paid_at: null,
     },
     { onConflict: "session_id,provider" },
   );

@@ -28,7 +28,23 @@ export default async function ResultadoPage({
     .eq("session_id", sessionId)
     .maybeSingle();
 
-  if (!resultRow?.narrative) redirect(`/resultado/${sessionId}/preview`);
+  if (!resultRow?.narrative) {
+    // Pagamento confirmado, mas o resultado ainda não foi calculado (não
+    // deveria acontecer no funil normal — calculate roda antes do
+    // pagamento). Não redireciona para o preview: como o preview também
+    // manda para cá quando paid=true, isso criaria um loop infinito.
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center bg-primary-light px-6 py-10 text-center">
+        <Card className="w-full max-w-md">
+          <p className="font-semibold text-primary">Seu pagamento foi confirmado.</p>
+          <p className="mt-2 text-sm text-muted">
+            Ainda estamos finalizando o cálculo do seu resultado. Atualize esta página em
+            alguns instantes.
+          </p>
+        </Card>
+      </main>
+    );
+  }
 
   const result = JSON.parse(resultRow.narrative) as FullResult;
 

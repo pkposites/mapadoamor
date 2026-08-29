@@ -14,11 +14,14 @@ type CreateResponse = {
   expires_at: string | null;
 };
 
+type ErrorState = { message: string; retryable: boolean };
+
 export function PixPayment({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const [data, setData] = useState<CreateResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorState | null>(null);
   const [copied, setCopied] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const startedAt = useRef<number | null>(null);
 
   useEffect(() => {
@@ -44,7 +47,12 @@ export function PixPayment({ sessionId }: { sessionId: string }) {
         setData(json);
         poll();
       } catch {
-        if (!cancelled) setError("Não conseguimos gerar o PIX agora. Tente novamente em instantes.");
+        if (!cancelled) {
+          setError({
+            message: "Não conseguimos gerar o PIX agora. Tente novamente em instantes.",
+            retryable: true,
+          });
+        }
       }
     }
 
@@ -62,7 +70,11 @@ export function PixPayment({ sessionId }: { sessionId: string }) {
           return;
         }
         if (json.status === "expired") {
-          setError("O PIX expirou. Gere um novo código para continuar.");
+          setError({ message: "O PIX expirou.", retryable: true });
+          return;
+        }
+        if (json.status === "cancelled") {
+          setError({ message: "O pagamento não foi aprovado.", retryable: true });
           return;
         }
       } catch {
@@ -77,7 +89,7 @@ export function PixPayment({ sessionId }: { sessionId: string }) {
       cancelled = true;
       clearTimeout(pollTimer);
     };
-  }, [router, sessionId]);
+  }, [router, sessionId, attempt]);
 
   async function copyToClipboard() {
     if (!data?.pix_copy_paste) return;
@@ -93,7 +105,20 @@ export function PixPayment({ sessionId }: { sessionId: string }) {
   if (error) {
     return (
       <Card className="w-full max-w-md text-center">
-        <p className="text-sm text-warm">{error}</p>
+        <p className="text-sm text-warm">{error.message}</p>
+        {error.retryable && (
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setData(null);
+              setAttempt((a) => a + 1);
+            }}
+            className="mt-4 w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            Gerar novo PIX
+          </button>
+        )}
       </Card>
     );
   }
