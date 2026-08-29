@@ -109,7 +109,7 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 - [x] Commit 3 — banco de perguntas + interface do quiz
 - [x] Commit 4 — scoring engine + testes unitários
 - [x] Commit 5 — preview e resultado mockado
-- [ ] Commit 6 — Mercado Pago sandbox + webhook
+- [x] Commit 6 — Mercado Pago sandbox + webhook
 - [ ] Commit 7 — bloqueio/liberação do resultado e estados de erro
 - [ ] Commit 8 — analytics + UTMs
 - [ ] Commit 9 — páginas legais + revisão de segurança
@@ -173,3 +173,45 @@ em `mda_results`.
   (nunca confiam em estado do frontend) — como ainda não existe pagamento
   real (Commit 6), a página de resultado completo só é alcançável hoje
   inserindo manualmente uma linha `mda_payments` com `status='paid'`.
+
+## Pagamento PIX
+
+`src/lib/mercadopago.ts` integra com a **Payments API v1** do Mercado
+Pago (`POST /v1/payments`, `payment_method_id: "pix"`) — não a Orders API
+mais recente sugerida na especificação. O domínio `mercadopago.com(.br)`
+está bloqueado pelo proxy de rede deste ambiente, então não deu para
+confirmar o payload exato da Orders API na documentação oficial antes de
+escrever o código; implementar um fluxo de pagamento real contra um
+contrato não verificado é arriscado demais, então usei a Payments API v1,
+estável e bem documentada há anos. **Migrar para a Orders API é uma
+pendência.**
+
+- `POST /api/payments/create` — cria (ou reaproveita, se ainda válido) o
+  PIX vinculado à sessão, com idempotency key por sessão.
+- `POST /api/webhooks/mercadopago` — valida a assinatura (`x-signature`,
+  HMAC-SHA256), consulta o pagamento direto na API do Mercado Pago (nunca
+  confia só no corpo do evento) e libera o resultado.
+- `GET /api/payment-status/:session` — `pending` / `paid` / `expired`,
+  usado pelo polling da tela de pagamento.
+- A tela `/resultado/[session]/pagamento` mostra QR Code + copia-e-cola e
+  faz polling a cada 4s até detectar a aprovação.
+
+Testes unitários (`src/lib/mercadopago.test.ts`) cobrem a validação de
+assinatura do webhook — a parte mais sensível a acertar sem poder testar
+contra o provedor real.
+
+### Pendências antes de testar de verdade
+
+- Preencher `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` no
+  `.env.local` com credenciais de sandbox (Dashboard Mercado Pago →
+  Suas integrações → credenciais de teste).
+- Confirmar o payload da Payments API `pix` num teste real de sandbox — em
+  especial os campos de QR Code (`point_of_interaction.transaction_data`)
+  e o formato de `x-signature` do webhook, que aqui foram implementados
+  a partir de conhecimento prévio, sem checar a documentação ao vivo.
+- Decidir se `payer.email` será coletado de verdade na tela de pagamento
+  ou se o placeholder sintético por sessão (`sessao-<id>@mapadoamor.app`)
+  é aceitável para produção — o Mercado Pago pode ter regras próprias
+  sobre e-mails de pagador não verificáveis.
+- Configurar `NEXT_PUBLIC_SITE_URL` com a URL pública em produção (usada
+  para montar a `notification_url` do webhook).
