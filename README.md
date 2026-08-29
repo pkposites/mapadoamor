@@ -64,10 +64,28 @@ pontuação.
 
 ## Modelo de dados (mínimo)
 
-`quiz_sessions`, `quiz_answers`, `quiz_scores`, `payments`, `results`,
-`events` — ver detalhes na especificação completa do produto. Minimizar
-dados pessoais: usar identificador interno de sessão, evitar persistir
-nome/CPF/e-mail além do estritamente necessário ao PSP.
+`mda_quiz_sessions`, `mda_quiz_answers`, `mda_quiz_scores`, `mda_payments`,
+`mda_results`, `mda_events` — schema em `supabase/migrations/`. Prefixo
+`mda_` porque o schema `public` é compartilhado com outros produtos no
+mesmo projeto Supabase. Minimizar dados pessoais: usar identificador
+interno de sessão, evitar persistir nome/CPF/e-mail além do estritamente
+necessário ao PSP.
+
+RLS habilitado em todas as tabelas, sem nenhuma policy para `anon`/
+`authenticated`: todo acesso passa pelo backend usando a service role key
+(`src/lib/supabase/server.ts`). O resultado pago é acessado por
+`access_token` (UUID aleatório em `mda_results`), nunca pelo `session_id`
+sequencial-friendly.
+
+### Setup local
+
+1. Copie `.env.example` para `.env.local`.
+2. Preencha `SUPABASE_SERVICE_ROLE_KEY` com a service role key do projeto
+   (Dashboard Supabase → Project Settings → API). Nunca commitar esse valor.
+3. `npm install && npm run dev`.
+
+Migrations ficam versionadas em `supabase/migrations/` e também são
+aplicadas via MCP Supabase durante o desenvolvimento assistido.
 
 ## Regras de segurança (não negociáveis)
 
@@ -87,7 +105,7 @@ nome/CPF/e-mail além do estritamente necessário ao PSP.
 ## Checklist de implementação
 
 - [x] Commit 1 — scaffold do app, design tokens, rotas e README
-- [ ] Commit 2 — schema Supabase + migrations + sessão anônima
+- [x] Commit 2 — schema Supabase + migrations + sessão anônima
 - [ ] Commit 3 — banco de perguntas + interface do quiz
 - [ ] Commit 4 — scoring engine + testes unitários
 - [ ] Commit 5 — preview e resultado mockado

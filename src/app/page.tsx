@@ -1,5 +1,5 @@
-import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { StartQuizButton } from "@/components/StartQuizButton";
 
 export default function LandingPage() {
   return (
@@ -31,9 +31,7 @@ export default function LandingPage() {
           </p>
         </Card>
 
-        <Button href="/quiz/novo" className="w-full">
-          Começar meu diagnóstico
-        </Button>
+        <StartQuizButton className="w-full" />
 
         <p className="text-xs text-muted">
           Resultado completo por R$ 37,90 via PIX. Sem cadastro, sem
