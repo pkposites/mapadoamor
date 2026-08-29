@@ -108,7 +108,7 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 - [x] Commit 2 — schema Supabase + migrations + sessão anônima
 - [x] Commit 3 — banco de perguntas + interface do quiz
 - [x] Commit 4 — scoring engine + testes unitários
-- [ ] Commit 5 — preview e resultado mockado
+- [x] Commit 5 — preview e resultado mockado
 - [ ] Commit 6 — Mercado Pago sandbox + webhook
 - [ ] Commit 7 — bloqueio/liberação do resultado e estados de erro
 - [ ] Commit 8 — analytics + UTMs
@@ -154,3 +154,22 @@ recomendação técnica da seção 6.3:
 `POST /api/calculate` valida que a sessão respondeu as 24 perguntas,
 executa o motor e persiste o resultado em `mda_quiz_scores`. Thresholds
 das regras são provisórios — mesma decisão em aberto do questionário.
+
+## Preview e resultado (Camada 5)
+
+`src/lib/result-content.ts` monta o conteúdo condicional (textos por
+perfil, explicação por dimensão, insights de combinação, 3 próximos
+movimentos) a partir do que a Camada 1–4 calculou — sem IA, por template
++ regra. `POST /api/calculate` já gera e persiste esse conteúdo completo
+em `mda_results`.
+
+- `GET /api/preview/:session` — só o pré-resultado: quantidade de
+  perguntas, 1 força e 1 atenção sem interpretação completa, frase de
+  curiosidade e categoria ampla do perfil (nunca o nome/perfil completo).
+- `GET /api/result/:session` — retorna o conteúdo completo **apenas**
+  quando existe um registro `mda_payments` com `status = 'paid'` para a
+  sessão. Sem isso, responde `402`. As páginas `/resultado/[session]` e
+  `/resultado/[session]/preview` fazem essa checagem direto no servidor
+  (nunca confiam em estado do frontend) — como ainda não existe pagamento
+  real (Commit 6), a página de resultado completo só é alcançável hoje
+  inserindo manualmente uma linha `mda_payments` com `status='paid'`.

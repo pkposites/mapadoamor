@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { TOTAL_QUESTIONS } from "@/lib/questions";
 import { computeResult } from "@/lib/scoring";
+import { buildFullResult } from "@/lib/result-content";
 
 // Valida que a sessão respondeu todas as perguntas e calcula os scores
 // deterministicamente (camadas 1–4 do motor de personalização). Idempotente:
@@ -62,6 +63,25 @@ export async function POST(request: Request) {
 
   if (upsertError) {
     return NextResponse.json({ error: "Não foi possível salvar os scores." }, { status: 500 });
+  }
+
+  const fullResult = buildFullResult(result);
+
+  const { error: resultsError } = await supabase.from("mda_results").upsert(
+    {
+      session_id: sessionId,
+      strengths: fullResult.strengths,
+      attention: fullResult.attention,
+      pattern_key: fullResult.profile_key,
+      actions: fullResult.next_moves,
+      narrative: JSON.stringify(fullResult),
+      generated_at: new Date().toISOString(),
+    },
+    { onConflict: "session_id" },
+  );
+
+  if (resultsError) {
+    return NextResponse.json({ error: "Não foi possível salvar o resultado." }, { status: 500 });
   }
 
   if (session.status !== "paid") {

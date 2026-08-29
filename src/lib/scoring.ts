@@ -86,13 +86,29 @@ export function determineProfile(scores: DimensionScores): ProfileKey {
   return "amor_em_construcao";
 }
 
-/** Camada 3 — 2 maiores forças e 2 menores índices. */
+const STRENGTH_THRESHOLD = 55;
+const ATTENTION_THRESHOLD = 65;
+
+/**
+ * Camada 3 — 2 maiores forças e 2 menores índices. Uma dimensão só entra
+ * como "ponto de atenção" se o score não for alto o bastante para já ter
+ * sido listado como força — evita a contradição de mostrar a mesma
+ * dimensão nos dois lados quando os índices estão todos altos e parecidos
+ * (ver seção 5/Fase 5 da especificação: revisar para evitar contradições).
+ */
 export function topStrengths(scores: DimensionScores, count = 2): DimensionKey[] {
-  return [...DIMENSIONS].sort((a, b) => scores[b] - scores[a]).slice(0, count);
+  return [...DIMENSIONS]
+    .filter((d) => scores[d] >= STRENGTH_THRESHOLD)
+    .sort((a, b) => scores[b] - scores[a])
+    .slice(0, count);
 }
 
 export function attentionAreas(scores: DimensionScores, count = 2): DimensionKey[] {
-  return [...DIMENSIONS].sort((a, b) => scores[a] - scores[b]).slice(0, count);
+  const strengths = new Set(topStrengths(scores, count));
+  return [...DIMENSIONS]
+    .filter((d) => !strengths.has(d) && scores[d] <= ATTENTION_THRESHOLD)
+    .sort((a, b) => scores[a] - scores[b])
+    .slice(0, count);
 }
 
 export type CombinationKey =

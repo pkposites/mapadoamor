@@ -118,6 +118,14 @@ describe("topStrengths / attentionAreas", () => {
     expect(topStrengths(s)).toEqual(["reciprocity", "communication"]);
     expect(attentionAreas(s)).toEqual(["connection", "security"]);
   });
+
+  it("nunca repete uma dimensão como força e como atenção ao mesmo tempo", () => {
+    const allHigh = scores({}); // todas em 60, acima do limiar de atenção
+    const strengths = topStrengths(allHigh);
+    const attention = attentionAreas(allHigh);
+
+    expect(attention.some((d) => strengths.includes(d))).toBe(false);
+  });
 });
 
 describe("detectCombinations", () => {
@@ -138,7 +146,7 @@ describe("detectCombinations", () => {
 });
 
 describe("computeResult (integração)", () => {
-  it("respostas majoritariamente positivas geram perfil recíproco com poucos pontos de atenção", () => {
+  it("respostas majoritariamente positivas geram perfil recíproco, sem pontos de atenção contraditórios", () => {
     const answers = answersForScores(scores({
       reciprocity: 90, communication: 85, security: 85,
       connection: 85, intimacy: 85, future_alignment: 85,
@@ -147,7 +155,26 @@ describe("computeResult (integração)", () => {
     const result = computeResult(answers);
     expect(result.profile_key).toBe("amor_reciproco");
     expect(result.strengths).toHaveLength(2);
-    expect(result.attention).toHaveLength(2);
+    // Todas as dimensões estão altas: não faz sentido apontar "atenção"
+    // em algo que também é força (evita a contradição citada na spec).
+    expect(result.attention).toHaveLength(0);
+    for (const dimension of result.strengths) {
+      expect(result.attention).not.toContain(dimension);
+    }
+  });
+
+  it("resultado com dimensões realmente fracas ainda aponta pontos de atenção distintos das forças", () => {
+    const answers = answersForScores(scores({
+      reciprocity: 90, communication: 85, security: 30,
+      connection: 35, intimacy: 60, future_alignment: 60,
+    }));
+
+    const result = computeResult(answers);
+    expect(result.strengths).toEqual(["reciprocity", "communication"]);
+    expect(result.attention).toEqual(["connection", "security"]);
+    for (const dimension of result.strengths) {
+      expect(result.attention).not.toContain(dimension);
+    }
   });
 
   it("usa todas as 20 perguntas de scoring do banco de perguntas real", () => {
