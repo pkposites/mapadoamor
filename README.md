@@ -106,7 +106,7 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 
 - [x] Commit 1 — scaffold do app, design tokens, rotas e README
 - [x] Commit 2 — schema Supabase + migrations + sessão anônima
-- [ ] Commit 3 — banco de perguntas + interface do quiz
+- [x] Commit 3 — banco de perguntas + interface do quiz
 - [ ] Commit 4 — scoring engine + testes unitários
 - [ ] Commit 5 — preview e resultado mockado
 - [ ] Commit 6 — Mercado Pago sandbox + webhook
@@ -118,7 +118,9 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 ## Decisões em aberto (antes de codar as próximas fases)
 
 - Nome final e identidade visual definitivos.
-- Questionário final com pontuação de cada alternativa.
+- Questionário final com pontuação de cada alternativa (rascunho provisório
+  em `src/lib/questions.ts` — 24 perguntas, 6 dimensões, precisa de revisão
+  de conteúdo/psicometria antes do lançamento).
 - Regras exatas de classificação dos 7 perfis.
 - Textos finais do preview/paywall e do resultado por combinação de scores.
 - Se haverá IA na narrativa já no MVP.
