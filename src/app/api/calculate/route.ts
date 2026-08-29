@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { TOTAL_QUESTIONS } from "@/lib/questions";
 import { computeResult } from "@/lib/scoring";
 import { buildFullResult } from "@/lib/result-content";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 // Valida que a sessão respondeu todas as perguntas e calcula os scores
 // deterministicamente (camadas 1–4 do motor de personalização). Idempotente:
@@ -14,6 +15,11 @@ export async function POST(request: Request) {
 
   if (!sessionId) {
     return NextResponse.json({ error: "session_id é obrigatório." }, { status: 400 });
+  }
+
+  const rateLimit = await checkRateLimit(`calculate:${clientIp(request)}`, 20, 60);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Muitas tentativas. Aguarde um instante." }, { status: 429 });
   }
 
   const supabase = createServiceClient();

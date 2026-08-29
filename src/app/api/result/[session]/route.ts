@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import type { FullResult } from "@/lib/result-content";
 
 // Só retorna conteúdo completo quando o pagamento está confirmado
@@ -7,10 +8,16 @@ import type { FullResult } from "@/lib/result-content";
 // do frontend/redirect — a única fonte de verdade é o registro de
 // pagamento gravado pelo webhook (Commit 6).
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ session: string }> },
 ) {
   const { session: sessionId } = await params;
+
+  const rateLimit = await checkRateLimit(`result:${clientIp(request)}`, 30, 60);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Muitas tentativas. Aguarde um instante." }, { status: 429 });
+  }
+
   const supabase = createServiceClient();
 
   const { data: payment } = await supabase

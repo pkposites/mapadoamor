@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { QUESTIONS, TOTAL_QUESTIONS } from "@/lib/questions";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
-const QUESTION_IDS = new Set(QUESTIONS.map((q) => q.id));
+const QUESTIONS_BY_ID = new Map(QUESTIONS.map((q) => [q.id, q]));
 
 // Salva uma resposta e atualiza o progresso da sessão. Idempotente por
 // (session_id, question_id): responder a mesma pergunta de novo substitui
@@ -13,18 +14,27 @@ export async function POST(request: Request) {
   const sessionId = typeof body?.session_id === "string" ? body.session_id : null;
   const questionId = typeof body?.question_id === "string" ? body.question_id : null;
   const answerKey = typeof body?.answer_key === "string" ? body.answer_key : null;
-  const numericValue = Number(body?.numeric_value);
 
-  if (
-    !sessionId ||
-    !questionId ||
-    !answerKey ||
-    !QUESTION_IDS.has(questionId) ||
-    !Number.isFinite(numericValue) ||
-    numericValue < 0 ||
-    numericValue > 100
-  ) {
+  if (!sessionId || !questionId || !answerKey) {
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
+  }
+
+  const question = QUESTIONS_BY_ID.get(questionId);
+  const option = question?.options.find((o) => o.key === answerKey);
+
+  if (!question || !option) {
+    return NextResponse.json({ error: "Pergunta ou alternativa inválida." }, { status: 400 });
+  }
+
+  // O valor da resposta nunca vem do client: é sempre derivado do banco de
+  // perguntas no servidor, a partir de question_id + answer_key. Confiar em
+  // um numeric_value enviado pelo frontend permitiria forjar pontuação alta
+  // sem responder as perguntas de verdade.
+  const numericValue = option.value;
+
+  const rateLimit = await checkRateLimit(`answers:${clientIp(request)}`, 60, 60);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Muitas tentativas. Aguarde um instante." }, { status: 429 });
   }
 
   const supabase = createServiceClient();
@@ -44,7 +54,7 @@ export async function POST(request: Request) {
       session_id: sessionId,
       question_id: questionId,
       answer_key: answerKey,
-      numeric_value: Math.round(numericValue),
+      numeric_value: numericValue,
     },
     { onConflict: "session_id,question_id" },
   );

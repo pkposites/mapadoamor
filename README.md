@@ -112,7 +112,7 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 - [x] Commit 6 — Mercado Pago sandbox + webhook
 - [x] Commit 7 — bloqueio/liberação do resultado e estados de erro
 - [x] Commit 8 — analytics + UTMs
-- [ ] Commit 9 — páginas legais + revisão de segurança
+- [x] Commit 9 — páginas legais + revisão de segurança
 - [ ] Commit 10 — produção, QA e tag v1.0.0
 
 ## Decisões em aberto (antes de codar as próximas fases)
@@ -270,6 +270,47 @@ Os 13 eventos da seção 15 estão instrumentados fim a fim: `ViewLanding`,
   fica fora do escopo do MVP).
 - UTMs (`utm_source/medium/campaign/content/term`) já são capturadas na
   criação da sessão (Commit 2) e persistidas em `mda_quiz_sessions`.
+
+## Páginas legais e revisão de segurança (Commit 9)
+
+`/privacidade` e `/termos` têm conteúdo real (LGPD, o que o produto não
+é/não promete, retenção de dados, reembolso, orientação de segurança para
+respostas sensíveis) em vez do placeholder dos commits anteriores. Um
+`Footer` com os links de privacidade/termos/suporte
+(`suporte@mapadoamor.app`, endereço provisório) aparece em todas as
+páginas — inclusive antes do pagamento, como a seção 13 exige.
+
+Checklist da seção 13, item a item:
+
+- ✅ Access Token do Mercado Pago nunca chega ao frontend (`mercadopago.ts`
+  é server-only).
+- ✅ Toda criação/consulta sensível de pagamento roda no servidor.
+- ✅ Idempotency key na criação de pagamento (Commit 6).
+- ✅ Resultado nunca libera por resposta do frontend — só por
+  `mda_payments.status='paid'` confirmado via webhook (Commit 6/7).
+- ✅ **Rate limiting** adicionado nos endpoints de pagamento e geração de
+  resultado: `mda_rate_limits` (nova migration) guarda uma janela por IP;
+  `POST /api/payments/create` (10/min), `POST /api/calculate` (20/min),
+  `GET /api/result/:session` (30/min) e `POST /api/answers` (60/min,
+  janela maior por gerar muito mais tráfego legítimo) recusam com 429
+  acima do limite.
+- ✅ RLS habilitado em todas as tabelas `mda_*`, sem policies públicas.
+- ⏳ Resultado acessado por `session_id`, não por `access_token` seguro —
+  gap conhecido, registrado abaixo, decisão explícita de adiar.
+- ✅ UTMs e campos livres sanitizados (truncados, tipo validado) desde o
+  Commit 2.
+- ✅ Nenhum dado sensível (CPF, resposta, score) vai para Meta Pixel/CAPI.
+- ✅ Política de privacidade, termos e contato de suporte agora visíveis
+  em todas as telas, inclusive antes do pagamento.
+
+**Bug de integridade corrigido neste commit**: `POST /api/answers`
+confiava no `numeric_value` enviado pelo client para gravar a pontuação
+da resposta — nada impedia forjar uma pontuação alta enviando qualquer
+número junto com um `answer_key` legítimo, mesmo sem realmente escolher
+aquela alternativa. Corrigido: o servidor agora sempre deriva o valor a
+partir de `question_id` + `answer_key` consultando o banco de perguntas
+(`QUESTIONS`), rejeitando qualquer combinação que não exista. O client
+não envia mais `numeric_value`.
 
 ### Nota de segurança pendente
 

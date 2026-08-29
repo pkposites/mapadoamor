@@ -40,12 +40,15 @@ export function QuizFlow({
     return MICROFEEDBACK.find((m) => progress >= m.at && progress - 1 / total < m.at);
   }, [progress, total]);
 
-  async function selectOption(optionKey: string, value: number) {
+  async function selectOption(optionKey: string) {
     if (saving) return;
     setSaving(true);
     setSelected((prev) => ({ ...prev, [question.id]: optionKey }));
 
     try {
+      // O valor numérico da resposta é sempre derivado no servidor a partir
+      // de question_id + answer_key — nunca enviado pelo client (ver
+      // POST /api/answers), então não precisa ir no payload aqui.
       const res = await fetch("/api/answers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,7 +56,6 @@ export function QuizFlow({
           session_id: sessionId,
           question_id: question.id,
           answer_key: optionKey,
-          numeric_value: value,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -109,7 +111,7 @@ export function QuizFlow({
                 key={option.key}
                 type="button"
                 disabled={saving}
-                onClick={() => selectOption(option.key, option.value)}
+                onClick={() => selectOption(option.key)}
                 className="w-full rounded-2xl border border-border bg-white px-5 py-4 text-left text-base font-medium text-foreground transition hover:border-primary hover:bg-primary-light active:scale-[0.99] disabled:opacity-60"
               >
                 {option.label}

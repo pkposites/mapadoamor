@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { createPixPayment } from "@/lib/mercadopago";
 import { effectiveStatus, isReusable } from "@/lib/payment-state";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 const PIX_AMOUNT = 37.9;
 
@@ -14,6 +15,11 @@ export async function POST(request: Request) {
 
   if (!sessionId) {
     return NextResponse.json({ error: "session_id é obrigatório." }, { status: 400 });
+  }
+
+  const rateLimit = await checkRateLimit(`payments:create:${clientIp(request)}`, 10, 60);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Muitas tentativas. Aguarde um instante." }, { status: 429 });
   }
 
   const supabase = createServiceClient();
