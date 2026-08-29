@@ -113,7 +113,8 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 - [x] Commit 7 — bloqueio/liberação do resultado e estados de erro
 - [x] Commit 8 — analytics + UTMs
 - [x] Commit 9 — páginas legais + revisão de segurança
-- [ ] Commit 10 — produção, QA e tag v1.0.0
+- [x] Commit 10 — produção, QA e tag v1.0.0 (código pronto; validação com
+  credenciais reais ainda pendente — ver abaixo)
 
 ## Decisões em aberto (antes de codar as próximas fases)
 
@@ -134,6 +135,8 @@ aplicadas via MCP Supabase durante o desenvolvimento assistido.
 npm install
 npm run dev
 npm run test   # testes unitários (vitest) do motor de pontuação
+npm run build  # build de produção + type check
+npm run lint
 ```
 
 ## Motor de pontuação
@@ -322,3 +325,58 @@ mas ele ainda não é usado — trocar a rota de resultado para usar
 `access_token` em vez do `session_id` bruto é um endurecimento de
 segurança recomendado antes do lançamento, não feito neste commit para
 não expandir escopo além de analytics.
+
+## Produção, QA e v1.0.0 (Commit 10)
+
+Este commit fecha os 10 commits da especificação (seção 23). O código
+está completo para o MVP descrito, `npm run build`/`lint`/`test` passam
+limpos, e um round-trip real contra o schema Supabase (sessão → scores →
+resultado → pagamento pago, via SQL direto) confirmou que os tipos e
+constraints batem com o que a aplicação lê/escreve. **Isso não substitui
+QA end-to-end pela UI com credenciais de sandbox reais** — sem
+`SUPABASE_SERVICE_ROLE_KEY` e `MERCADOPAGO_ACCESS_TOKEN`/
+`MERCADOPAGO_WEBHOOK_SECRET` preenchidos, o app não roda de fato.
+
+### Checklist de QA da seção 18/Fase 5 — o que dá para garantir por código vs. o que precisa de teste manual
+
+Garantido por código/testes automatizados:
+- ✅ Pagamento confirmado nunca volta a bloquear o resultado (testado em
+  `payment-state.test.ts`).
+- ✅ Idempotência de webhook repetido (não duplica `Purchase`/`paid_at`).
+- ✅ Nenhuma combinação de scores gera "força" e "atenção" na mesma
+  dimensão (testado em `scoring.test.ts`).
+- ✅ Resultado só libera com pagamento confirmado no servidor.
+
+Precisa de teste manual com credenciais reais (pendência sua):
+- [ ] Pagamento aprovado, pendente, expirado e duplicado num sandbox real
+  do Mercado Pago — o código trata os 4 casos, mas nunca foi exercitado
+  contra a API de verdade (ver ressalva na seção "Pagamento PIX").
+- [ ] iPhone/Android e navegadores principais.
+- [ ] Conexão lenta e refresh durante o PIX.
+- [ ] Expiração real do PIX (hoje configurada para 30 min).
+- [ ] Revisar as 7×6 combinações de perfil/dimensão em busca de
+  contradições de texto (o motor evita a contradição estrutural
+  força-vs-atenção, mas não foi lido perfil por perfil por um humano).
+- [ ] Compra real de baixo risco em produção antes de abrir tráfego.
+
+### Deploy (Vercel)
+
+1. Conectar o repositório no Vercel (o projeto já é um Next.js padrão,
+   zero-config).
+2. Configurar as variáveis de ambiente de produção (mesmas chaves do
+   `.env.example`), com `NEXT_PUBLIC_SITE_URL` apontando para o domínio
+   real e credenciais de **produção** do Mercado Pago (não as de sandbox).
+3. Registrar a URL do webhook (`https://<domínio>/api/webhooks/mercadopago`)
+   no painel do Mercado Pago.
+4. Rodar as migrations pendentes (`supabase/migrations/`) contra o
+   projeto Supabase de produção, se for um projeto diferente do usado em
+   desenvolvimento.
+5. Confirmar HTTPS (obrigatório para o Meta Pixel e para o Mercado Pago
+   validar o webhook).
+
+### Tag
+
+`v1.0.0` marca o MVP funcionalmente completo conforme a especificação —
+scaffold do produto pronto para QA manual e configuração de credenciais
+de produção, não uma validação de que já rodou de ponta a ponta com
+dinheiro real.
